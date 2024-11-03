@@ -19,10 +19,7 @@ Here's a quick overview of the programs you'll find here:
 
 Each file is self-contained and demonstrates a specific Python concept. You can run these programs directly from the command line or through a Python IDE.
 
-To run a program, navigate to the folder containing the file and use the command:
-```bash
-
-python filename.py
+To run a program, navigate to the folder containing the file and use the command: python filename.py
 
 ## 📖 Learning Objectives
 
