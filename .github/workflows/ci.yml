@@ -17,7 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Basic environment debug
       - name: Show runner info & repo contents (debug)
         run: |
           echo "=== whoami / env ==="
@@ -29,8 +28,7 @@ jobs:
           python -m pip --version || echo "pip not found"
           echo "=== repo files ==="
           ls -la
-          echo "=== recursive list (top-level) ==="
-          ls -la .github || true
+          echo "=== top-level files ==="
           ls -la .
 
       - name: Set up Python
@@ -73,10 +71,8 @@ jobs:
           echo "=== top-level files ==="
           ls -la
 
-      - name: Lint (flake8) — may fail if issues
-        continue-on-error: false
+      - name: Lint (flake8)
         run: |
-          # adjust path if needed
           flake8 . || true
 
       - name: Run pytest with coverage and junit outputs
@@ -85,7 +81,6 @@ jobs:
           PYTEST_ADDOPTS: "--junitxml=test-results/junit-${{ matrix.python-version }}.xml --cov=./ --cov-report=xml:coverage.xml"
         run: |
           mkdir -p test-results
-          # make sure we have at least one test file (helpful when repo has none)
           if [ ! -d "tests" ] || [ -z "$(ls -A tests 2>/dev/null)" ]; then
             echo "WARNING: No tests found in /tests — creating a tiny smoke test so CI can run."
             mkdir -p tests
@@ -94,7 +89,6 @@ def test_smoke():
     assert 1 + 1 == 2
 PYTEST
           fi
-          # run pytest (exit code 0 -> success, non-0 -> fail)
           pytest -q || exit $?
 
       - name: Show test-results folder contents (debug)
@@ -120,8 +114,13 @@ PYTEST
           name: coverage-${{ matrix.python-version }}
           path: coverage.xml
 
-      - name: Build dist (optional)
-        if: success() && (exists('pyproject.toml') || exists('setup.py'))
+      - name: Build distribution (optional)
+        if: success()
         run: |
-          python -m pip install build
-          python -m build --sdist --wheel
+          # build only if pyproject.toml or setup.py seems present
+          if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+            python -m pip install build
+            python -m build --sdist --wheel
+          else
+            echo "No pyproject.toml or setup.py found — skipping build."
+          fi
