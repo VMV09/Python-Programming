@@ -1,4 +1,4 @@
-from basic_programs.helloworld import helloworld
+from basic_programs.HelloWorld import helloworld
 
 def test_helloworld():
   assert helloworld == "Hello World"
