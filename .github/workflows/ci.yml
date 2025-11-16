@@ -1,0 +1,93 @@
+name: CI — tests, lint, build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt','**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install build tools
+        run: python -m pip install --upgrade pip build wheel setuptools
+
+      - name: Install dependencies
+        # prefer pyproject (poetry/pep517) or fallback to requirements.txt
+        run: |
+          if [ -f "pyproject.toml" ]; then
+            # If using dependencies in pyproject with PEP 621 or poetry, adapt below
+            python -m pip install --upgrade pip
+            python -m pip install -e .[test] || true
+            python -m pip install -r requirements.txt 2>/dev/null || true
+          else
+            python -m pip install -r requirements.txt
+          fi
+
+      - name: Install dev/test tools
+        run: python -m pip install pytest pytest-cov flake8 mypy junit-xml
+
+      - name: Lint (flake8)
+        continue-on-error: false
+        run: |
+          # adjust paths as needed
+          flake8 .
+
+      - name: Type-check (mypy) — optional
+        if: always()
+        run: |
+          # make this non-blocking if you want by using continue-on-error: true
+          mypy .
+
+      - name: Run tests with coverage
+        env:
+          PYTEST_ADDOPTS: "--junitxml=test-results/junit-${{ matrix.python-version }}.xml --cov=./ --cov-report=xml"
+        run: |
+          mkdir -p test-results
+          pytest -q
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.python-version }}
+          path: test-results/junit-${{ matrix.python-version }}.xml
+
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-${{ matrix.python-version }}
+          path: coverage.xml
+
+      - name: Build distributions (wheel + sdist)
+        if: success()
+        run: |
+          python -m build --sdist --wheel
+
+      - name: Upload built dist
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.python-version }}
+          path: dist/*
